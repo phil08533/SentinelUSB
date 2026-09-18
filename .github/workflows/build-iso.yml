@@ -31,6 +31,7 @@ jobs:
           python3 -m py_compile live-build/config/includes.chroot/usr/local/lib/sentinelusb/scanner.py
           python3 -m py_compile live-build/config/includes.chroot/usr/local/lib/sentinelusb/storage.py
           python3 -m py_compile live-build/config/includes.chroot/usr/local/lib/sentinelusb/gui.py
+          python3 -m unittest discover -s tests -v
 
       - name: Build ISO
         working-directory: live-build
