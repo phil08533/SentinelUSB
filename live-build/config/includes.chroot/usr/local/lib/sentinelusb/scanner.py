@@ -2,7 +2,7 @@
 """SentinelUSB scanning engine. Safe-by-default Windows volume scanning."""
 
 from __future__ import annotations
-import hashlib, json, os, shutil, subprocess, tempfile
+import hashlib, json, os, shutil, subprocess, tempfile, time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -102,7 +102,9 @@ def add_hashes(findings,root):
             if path.is_file() and path.stat().st_size <= 256*1024*1024: f["sha256"]=sha256_file(path)
         except (OSError,PermissionError): pass
 
-def scan(device,rules,output_dir):
+def scan(device,rules,output_root):
+    stamp=time.strftime('%Y-%m-%d_%H-%M-%S')
+    output_dir=Path(output_root)/f'Scan_{stamp}'
     output_dir.mkdir(parents=True,exist_ok=True)
     mountpoint=mount_read_only(device)
     try:
@@ -116,7 +118,7 @@ def scan(device,rules,output_dir):
         report={"product":"SentinelUSB","version":"0.1.0",
                 "started_at":datetime.now(timezone.utc).isoformat(),
                 "completed_at":datetime.now(timezone.utc).isoformat(),
-                "device":device,"mount_mode":"read-only","finding_count":len(findings),
+                "device":device,"mount_mode":"read-only","report_directory":str(output_dir),"finding_count":len(findings),
                 "findings":findings,
                 "engine_status":{"clamav":"ok" if not any(x.get("error") for x in clam) else "error",
                                  "yara":"ok" if not any(x.get("error") for x in yara) else "error"}}
