@@ -259,6 +259,7 @@ def windows_registry_checks(root):
     if system.is_file():
         findings.extend(_service_registry_findings(system))
 
+    users = root / "Users"
     if users.is_dir():
         try:
             user_dirs = [p for p in users.iterdir() if p.is_dir()]
