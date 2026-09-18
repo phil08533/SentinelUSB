@@ -39,7 +39,9 @@ $$_________$$$$$$$$$$$$$$$__________________
 '''
 
 RULES=Path("/usr/local/share/sentinelusb/rules/sentinel.yar")
-REPORTS=Path("/var/log/sentinelusb")
+REPORTS=Path("/run/live/medium/Reports")
+if not os.access(REPORTS.parent, os.W_OK):
+    REPORTS=Path("/var/log/sentinelusb")
 
 def help_text():
     print("""
@@ -78,7 +80,8 @@ def do_scan(device):
         print(f"[!] Scan failed: {exc}")
         return
     print(f"\n[+] Scan complete: {report['finding_count']} finding(s)")
-    print(f"[+] JSON report: {REPORTS/'report.json'}")
+    print("[+] Report directory:", report["report_directory"])
+    print("[+] HTML report:", Path(report["report_directory"]) / "report.html")
     print(f"[+] ClamAV log:  {REPORTS/'clamav.log'}")
 
 def dispatch(parts):
