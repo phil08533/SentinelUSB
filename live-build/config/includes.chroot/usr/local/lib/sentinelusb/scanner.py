@@ -465,9 +465,9 @@ def write_html(report, path):
     body = "".join(rows) or '<tr><td colspan="5">No findings reported.</td></tr>'
     page = """<!doctype html><html><head><meta charset="utf-8">
 <title>SentinelUSB Scan Report</title>
-<style>body{font:15px system-ui,sans-serif;max-width:1200px;margin:40px auto;padding:0 20px}
-table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px;text-align:left}
-code{word-break:break-all}.meta{line-height:1.7}</style></head><body>
+<style>body{{font:15px system-ui,sans-serif;max-width:1200px;margin:40px auto;padding:0 20px}}
+table{{width:100%;border-collapse:collapse}}th,td{{border:1px solid #ccc;padding:8px;text-align:left}}
+code{{word-break:break-all}}.meta{{line-height:1.7}}</style></head><body>
 <h1>SentinelUSB Scan Report</h1>
 <div class="meta"><p><b>Device:</b> {}</p><p><b>Detected OS:</b> {}</p>
 <p><b>Mode:</b> READ-ONLY</p><p><b>Findings:</b> {}</p>
