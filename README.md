@@ -17,7 +17,7 @@ SentinelUSB is a defensive analysis and rescue tool. Only use it on systems you 
 
 The scanning engine supports OS-aware analysis profiles for Windows, Linux, and macOS. Common file scanning uses ClamAV and YARA; persistence analysis changes according to the detected operating system.
 
-macOS support is intentionally best-effort at the filesystem layer: SentinelUSB can analyze a macOS volume when the Debian live environment can mount it read-only. Modern APFS volumes may require additional filesystem support and are not silently modified or force-mounted.
+macOS support is intentionally best-effort at the filesystem layer: SentinelUSB can analyze a macOS volume when the Debian live environment can mount it read-only. APFS is handled with the userspace fsapfsmount utility; encrypted or inaccessible volumes are reported rather than force-mounted. Windows Registry startup and service artifacts are also checked when the relevant hives are readable.
 
 ## Planned workflow
 
@@ -45,7 +45,7 @@ See [docs/SCANNING.md](docs/SCANNING.md).
 
 ## Roadmap
 
-See [ROADMAP.md](ROADMAP.md).
+See [ROADMAP.md](ROADMAP.md).\n\nFor persistent report storage, see [docs/STORAGE.md](docs/STORAGE.md).
 
 ## License
 
