@@ -11,3 +11,5 @@ jq
 util-linux
 pciutils
 usbutils
+libfsapfs-utils
+fuse3
