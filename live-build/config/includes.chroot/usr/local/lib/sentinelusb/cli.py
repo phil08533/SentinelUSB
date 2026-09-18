@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import shlex
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -38,6 +39,7 @@ Commands:
   drives               List disks and partitions
   storage              Show persistent report-storage status
   scan <device>        Scan a Windows, Linux, or macOS volume read-only
+  update               Update ClamAV definitions when online
   gui                  Launch the graphical scanner
   exit                 Leave SentinelUSB
 
@@ -106,6 +108,21 @@ def do_scan(device):
     print("[+] ClamAV log:", Path(report["report_directory"]) / "clamav.log")
 
 
+
+def update_clamav():
+    if os.geteuid() != 0:
+        print("ClamAV update requires root privileges.")
+        return
+    if not shutil.which("freshclam"):
+        print("[!] freshclam is not installed.")
+        return
+    print("[+] Updating ClamAV definitions...")
+    result = subprocess.run(["freshclam"], text=True)
+    if result.returncode == 0:
+        print("[+] ClamAV definitions updated.")
+    else:
+        print(f"[!] freshclam exited with {result.returncode}. The machine may be offline or the update server may be unavailable.")
+
 def launch_gui():
     if os.geteuid() != 0:
         print("GUI requires root privileges.")
@@ -136,6 +153,8 @@ def dispatch(parts):
             print(f"[!] Storage status failed: {exc}")
     elif cmd == "scan" and len(parts) == 2:
         do_scan(parts[1])
+    elif cmd == "update" and len(parts) == 1:
+        update_clamav()
     elif cmd == "gui" and len(parts) == 1:
         launch_gui()
     else:
