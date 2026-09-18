@@ -11,7 +11,7 @@ import hashlib, html, json, os, shutil, subprocess, tempfile, time
 from datetime import datetime, timezone
 from pathlib import Path
 
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 
 
 def run(cmd):
@@ -65,7 +65,58 @@ def detect_os(root):
     return "Unknown"
 
 
+def filesystem_type(device):
+    result = run(["blkid", "-o", "value", "-s", "TYPE", device])
+    return result.stdout.strip().lower() if result.returncode == 0 else ""
+
+
+def _fuse_unmount(mountpoint):
+    for command in (["fusermount3", "-u", str(mountpoint)],
+                    ["fusermount", "-u", str(mountpoint)],
+                    ["umount", str(mountpoint)]):
+        if shutil.which(command[0]):
+            result = run(command)
+            if result.returncode == 0:
+                return
+    run(["umount", str(mountpoint)])
+
+
+def mount_apfs_read_only(device):
+    """Mount the macOS APFS volume containing the OS, read-only.
+
+    libfsapfs is a userspace, read-only APFS implementation. An APFS
+    container can hold several volumes, so probe volume indexes until the
+    macOS system volume is found. Encrypted/FileVault volumes are reported
+    as inaccessible rather than attempting to bypass encryption.
+    """
+    if shutil.which("fsapfsmount") is None:
+        raise RuntimeError("APFS support is not installed (fsapfsmount missing)")
+
+    errors = []
+    for index in range(1, 17):
+        mountpoint = Path(tempfile.mkdtemp(prefix=f"sentinelusb-apfs-{index}-"))
+        result = run(["fsapfsmount", "-f", str(index), device, str(mountpoint)])
+        if result.returncode != 0:
+            errors.append(result.stderr.strip())
+            shutil.rmtree(mountpoint, ignore_errors=True)
+            continue
+
+        os_name = detect_os(mountpoint)
+        if os_name == "macOS":
+            return mountpoint
+
+        _fuse_unmount(mountpoint)
+        shutil.rmtree(mountpoint, ignore_errors=True)
+
+    detail = next((e for e in errors if e), "no APFS volume matched the macOS filesystem markers")
+    raise RuntimeError(f"Could not access a macOS APFS system volume: {detail}")
+
+
 def mount_read_only(device):
+    fstype = filesystem_type(device)
+    if fstype in {"apfs", "apfs_member"}:
+        return mount_apfs_read_only(device)
+
     mountpoint = Path(tempfile.mkdtemp(prefix="sentinelusb-"))
     result = run(["mount", "-o", "ro,nosuid,nodev,noexec", device, str(mountpoint)])
     if result.returncode != 0:
@@ -75,7 +126,7 @@ def mount_read_only(device):
 
 
 def unmount(mountpoint):
-    run(["umount", str(mountpoint)])
+    _fuse_unmount(mountpoint)
 
 
 def sha256_file(path):
@@ -371,6 +422,7 @@ def scan(device, rules, output_root):
             "engine_status": {
                 "clamav": "ok" if not any(x.get("error") for x in clam) else "error",
                 "yara": "ok" if not any(x.get("error") for x in yara) else "error",
+                "apfs": "available" if shutil.which("fsapfsmount") else "unavailable",
             },
         }
         (output_dir / "report.json").write_text(json.dumps(report, indent=2))
