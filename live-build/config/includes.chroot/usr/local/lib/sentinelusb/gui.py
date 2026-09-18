@@ -139,9 +139,7 @@ class SentinelWindow(QWidget):
         answer = QMessageBox.question(
             self,
             "Start read-only scan?",
-            f"SentinelUSB will mount {device} read-only and scan it.
-
-Continue?",
+            f"SentinelUSB will mount {device} read-only and scan it. Continue?",
         )
         if answer != QMessageBox.Yes:
             return
