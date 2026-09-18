@@ -22,7 +22,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y live-build
 
-      - name: Validate SentinelUSB scripts\n        run: |\n          python3 -m py_compile live-build/config/includes.chroot/usr/local/lib/sentinelusb/cli.py\n          python3 -m py_compile live-build/config/includes.chroot/usr/local/lib/sentinelusb/scanner.py\n\n      - name: Build ISO
+      - name: Validate SentinelUSB scripts
+        run: |
+          python3 -m py_compile live-build/config/includes.chroot/usr/local/lib/sentinelusb/cli.py
+          python3 -m py_compile live-build/config/includes.chroot/usr/local/lib/sentinelusb/scanner.py
+
+      - name: Build ISO
         working-directory: live-build
         run: |
           chmod +x auto/config
