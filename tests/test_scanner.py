@@ -58,6 +58,13 @@ class ScannerTests(unittest.TestCase):
         self.assertIn("nodev", mount_cmd[2])
         self.assertIn("noexec", mount_cmd[2])
 
+    def test_finding_paths_are_portable(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            findings = [{"path": str(root / "Windows" / "bad.exe")}]
+            scanner.normalize_finding_paths(findings, root)
+            self.assertEqual(findings[0]["path"], "Windows/bad.exe")
+
     def test_html_escapes_report_fields(self):
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / "report.html"
