@@ -1,0 +1,56 @@
+#!/bin/sh
+set -eu
+
+SENTINEL_USER="sentinel"
+
+if ! id "$SENTINEL_USER" >/dev/null 2>&1; then
+    useradd --create-home --shell /bin/bash "$SENTINEL_USER"
+fi
+
+usermod -aG sudo "$SENTINEL_USER"
+
+# Sentinel is an offline/physical rescue environment. The live user is
+# intentionally passwordless because the console is protected by physical
+# access to the bootable media.
+passwd -d "$SENTINEL_USER" >/dev/null 2>&1 || true
+
+install -d -m 0755 /etc/sudoers.d
+cat > /etc/sudoers.d/sentinel <<'EOF'
+sentinel ALL=(ALL) NOPASSWD: ALL
+EOF
+chmod 0440 /etc/sudoers.d/sentinel
+
+# Replace live-config's failing automatic-login mechanism with an explicit
+# Debian/systemd getty configuration for the known live user.
+install -d -m 0755 /etc/systemd/system/getty@tty1.service.d
+cat > /etc/systemd/system/getty@tty1.service.d/sentinel-autologin.conf <<'EOF'
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin sentinel --noclear %I $TERM
+RestartSec=1s
+EOF
+
+# Start the Sentinel GUI when Xorg is available. If X cannot start on a
+# particular machine, fall back to the terminal interface instead.
+cat > /home/$SENTINEL_USER/.bash_profile <<'EOF'
+if [ -z "${DISPLAY:-}" ] && [ "${XDG_VTNR:-}" = "1" ]; then
+    if command -v startx >/dev/null 2>&1 && [ -x /usr/bin/Xorg ]; then
+        sudo -n startx /usr/local/bin/sentinelusb-gui -- -nolisten tcp
+        if [ "$?" -eq 0 ]; then
+            exit 0
+        fi
+    fi
+    exec /usr/local/bin/sentinelusb
+fi
+EOF
+chown "$SENTINEL_USER:$SENTINEL_USER" /home/$SENTINEL_USER/.bash_profile
+chmod 0644 /home/$SENTINEL_USER/.bash_profile
+
+# Give the GUI a minimal X startup file so xinit does not fall back to
+# launching xterm/twm when Sentinel exits.
+cat > /home/$SENTINEL_USER/.xinitrc <<'EOF'
+#!/bin/sh
+exec sudo -n /usr/local/bin/sentinelusb-gui
+EOF
+chown "$SENTINEL_USER:$SENTINEL_USER" /home/$SENTINEL_USER/.xinitrc
+chmod 0755 /home/$SENTINEL_USER/.xinitrc
