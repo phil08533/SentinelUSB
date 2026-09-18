@@ -14,12 +14,12 @@ h2{font-size:42px;letter-spacing:-2px;margin:0 0 14px}section{padding:70px 0;bor
 .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:30px;margin-top:35px}.step strong{font-size:38px}.step h3{font-size:21px;margin:5px 0}.step p{line-height:1.5}.note{margin-top:30px;padding:18px;border:2px solid #171717}
 .about{display:grid;grid-template-columns:1fr 1fr;gap:60px}.donate{background:#d7ff38;padding:30px}.donate h2{font-size:34px}
 footer{border-top:2px solid #171717;padding:28px 0 50px;font-size:13px}.footer{display:flex;justify-content:space-between;gap:20px}
-@media(max-width:750px){.nav{display:block}.navlinks{margin-top:12px}.hero,.about{grid-template-columns:1fr}.ascii{font-size:8px}.features,.steps{grid-template-columns:1fr}.hero h1{letter-spacing:-3px}.footer{display:block}}
+@media(max-width:780px){.wrap{padding:0 18px}header{display:block;padding:18px 0}.nav{margin-top:18px;justify-content:flex-start;gap:0}.nav a{margin-right:18px;margin-bottom:10px}.hero{grid-template-columns:1fr;gap:25px;padding:50px 0}.hero h1{letter-spacing:-3px}.hero-art{min-height:300px}.hero-art img{max-width:340px;max-height:330px}.features,.steps{grid-template-columns:1fr}section{padding:55px 0}h2{font-size:36px}.footer{display:block}}@media(prefers-reduced-motion:reduce){.hero-art img,.hero-art:before{animation:none}}
 </style>
 </head>
 <body>
 <div class="wrap">
-<header><div class="logo">SENTINEL<span>USB</span></div><nav class="nav navlinks"><a href="#what">What it does</a><a href="#start">Start here</a><a href="#about">About</a><a href="https://github.com/phil08533/SentinelUSB">GitHub</a></nav></header>
+<header><div class="logo">SENTINEL<span>USB</span></div><nav class="nav navlinks"><a href="index.html">Home</a><a href="about.html">About me</a><a href="how-to-use.html">How to use</a><a href="tools.html">Tools</a><a href="https://github.com/phil08533/SentinelUSB">GitHub</a></nav></header>
 
 <main>
 <div class="hero">
@@ -29,23 +29,7 @@ footer{border-top:2px solid #171717;padding:28px 0 50px;font-size:13px}.footer{d
 <p>SentinelUSB boots from a USB drive and gives you a clean place to inspect a Windows installation for malware and suspicious persistence.</p>
 <div class="buttons"><a class="button primary" href="https://github.com/phil08533/SentinelUSB/releases/latest/download/SentinelUSB.iso">Download the ISO</a><a class="button" href="#start">How it works</a></div>
 </div>
-<pre class="ascii" aria-label="Sentinel ASCII art">      .-=========-.
-      \`-=======-\`/
-      _|   _____   |_
-     ( |  / ___   | )
-      \  | |   | |  /
-       \ | |___| | /
-        \ \\___// /
-         '._   _.'
-            | |
-       _____| |_____
-      /      |      \
-     /   ____|____   \
-    /___/   / \   \___\
-       /___/   \___\
-          /  |  \
-         /___|___\
-        SENTINELUSB</pre>
+<div class="hero-art"><img src="1789708603085.png" alt="SentinelUSB sword and USB illustration"></div>
 </div>
 
 <section id="what">
