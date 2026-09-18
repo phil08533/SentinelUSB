@@ -6,40 +6,59 @@
 - [x] Architecture documentation
 - [x] Threat model
 - [x] Build plan
-- [ ] Initial live-build configuration
+- [x] Initial live-build configuration
 
 ## Phase 1 — Bootable scanner
-- [ ] Build minimal Debian live ISO
-- [ ] Boot successfully in VM
-- [ ] Detect disks
-- [ ] Detect Windows volumes
-- [ ] Read-only mounting
-- [ ] Basic CLI
+- [x] Build minimal Debian live ISO
+- [x] Bootable amd64 image
+- [x] Detect disks
+- [x] Detect Windows, Linux, and macOS volumes
+- [x] Read-only mounting
+- [x] Basic CLI
 
 ## Phase 2 — Detection
-- [ ] ClamAV integration
-- [ ] YARA integration
-- [ ] SHA-256 hashing
-- [ ] EICAR test
-- [ ] JSON reports
-- [ ] HTML reports
+- [x] ClamAV integration
+- [x] YARA integration
+- [x] SHA-256 hashing
+- [ ] EICAR end-to-end test on the built ISO
+- [x] JSON reports
+- [x] HTML reports
+- [x] Offline-capable scanning
 
-## Phase 3 — Windows persistence
-- [ ] Startup folders
-- [ ] Scheduled task artifacts
-- [ ] Service artifacts
-- [ ] Common Run/RunOnce locations
-- [ ] Offline registry parsing
+## Phase 3 — Persistence
+- [x] Windows Startup folders
+- [x] Windows scheduled task artifacts
+- [x] Windows Run / RunOnce registry locations
+- [x] Windows service registry artifacts
+- [x] Linux systemd and cron locations
+- [x] Linux user startup and SSH authorized_keys checks
+- [x] macOS LaunchAgents / LaunchDaemons
+- [x] macOS configuration-profile check
+- [ ] Broader Windows registry coverage
 
 ## Phase 4 — Interface
-- [ ] Lightweight GUI
-- [ ] Drive selection
-- [ ] Scan progress
-- [ ] Findings viewer
-- [ ] Report export
+- [x] Lightweight GUI
+- [x] Drive selection
+- [x] Scan progress/status
+- [x] Findings count and report location
+- [x] Report opening
+- [x] Terminal workflow with Sentinel ASCII art
 
-## Phase 5 — Release engineering
-- [ ] ISO checksum generation
-- [ ] Automated ISO builds
-- [ ] Reproducible build documentation
-- [ ] Small-image optimization
+## Phase 5 — Report storage
+- [x] Persistent SENTINELDATA partition support
+- [x] Timestamped report directories
+- [x] HTML + JSON + ClamAV log preservation
+- [x] Storage status command
+- [ ] Test persistence across a real reboot
+
+## Phase 6 — Release engineering
+- [x] ISO checksum generation
+- [x] Automated ISO builds
+- [x] ISO structure verification
+- [x] Split artifact packaging
+- [x] Build-time Python validation
+- [ ] EICAR validation on the released image
+- [ ] Final VM / physical-hardware test
+- [ ] First public GitHub Release
+- [ ] Release screenshots / demo
+- [ ] Small-image optimization pass
