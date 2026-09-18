@@ -21,7 +21,7 @@ jobs:
       - name: Install live-build
         run: |
           sudo apt-get update
-          sudo apt-get install -y debootstrap cpio wget
+          sudo apt-get install -y debootstrap cpio wget debian-archive-keyring
           wget -q https://deb.debian.org/debian/pool/main/l/live-build/live-build_20250505+deb13u1_all.deb
           sudo dpkg -i live-build_20250505+deb13u1_all.deb
 
