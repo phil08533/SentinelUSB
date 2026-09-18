@@ -96,7 +96,7 @@ class SentinelWindow(QWidget):
 
         for device in self.devices:
             path = device.get("path") or ""
-            if not path or device.get("type") not in {"part", "disk"}:
+            if not path or device.get("type") != "part":
                 continue
             label = device.get("label") or "-"
             fstype = device.get("fstype") or "-"
