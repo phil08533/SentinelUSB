@@ -1,0 +1,59 @@
+name: Publish SentinelUSB v0.1.0
+
+on:
+  push:
+    branches:
+      - release/v0.1.0
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install live-build
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y debootstrap cpio wget debian-archive-keyring xorriso
+          wget -q https://deb.debian.org/debian/pool/main/l/live-build/live-build_20250505+deb13u1_all.deb
+          sudo dpkg -i live-build_20250505+deb13u1_all.deb
+
+      - name: Validate scripts
+        run: |
+          python3 -m py_compile live-build/config/includes.chroot/usr/local/lib/sentinelusb/cli.py
+          python3 -m py_compile live-build/config/includes.chroot/usr/local/lib/sentinelusb/scanner.py
+          python3 -m py_compile live-build/config/includes.chroot/usr/local/lib/sentinelusb/storage.py
+          python3 -m py_compile live-build/config/includes.chroot/usr/local/lib/sentinelusb/gui.py
+          python3 -m unittest discover -s tests -v
+
+      - name: Build ISO
+        working-directory: live-build
+        run: |
+          chmod +x auto/config
+          sudo lb build
+
+      - name: Verify release ISO
+        working-directory: live-build
+        run: |
+          ISO="$(find . -maxdepth 1 -type f -name '*.iso' -print -quit)"
+          test -n "$ISO"
+          cp "$ISO" SentinelUSB.iso
+          test "$(file -b SentinelUSB.iso | grep -c 'ISO 9660')" -eq 1
+          xorriso -indev SentinelUSB.iso -toc >/tmp/sentinel-xorriso.txt 2>&1
+          sha256sum SentinelUSB.iso > SentinelUSB.iso.sha256
+          ls -lh SentinelUSB.iso SentinelUSB.iso.sha256
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        working-directory: live-build
+        run: |
+          gh release create v0.1.0 SentinelUSB.iso SentinelUSB.iso.sha256 \
+            --repo phil08533/SentinelUSB \
+            --target "$GITHUB_SHA" \
+            --title "SentinelUSB v0.1.0" \
+            --notes "First public SentinelUSB release. Bootable Debian-based security rescue environment with read-only OS scanning, ClamAV, YARA, Windows Registry persistence checks, Linux/macOS persistence checks, APFS support, HTML/JSON reports, persistent SENTINELDATA report storage, CLI, and lightweight GUI." \
+            --latest
