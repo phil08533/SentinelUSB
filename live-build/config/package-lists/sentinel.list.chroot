@@ -13,3 +13,5 @@ pciutils
 usbutils
 libfsapfs-utils
 fuse3
+libhivex-bin
+libwin-hivex-perl
