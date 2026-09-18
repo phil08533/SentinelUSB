@@ -2,7 +2,7 @@
 """SentinelUSB scanning engine. Safe-by-default Windows volume scanning."""
 
 from __future__ import annotations
-import hashlib, json, os, shutil, subprocess, tempfile, time
+import hashlib, html, json, os, shutil, subprocess, tempfile, time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -102,6 +102,18 @@ def add_hashes(findings,root):
             if path.is_file() and path.stat().st_size <= 256*1024*1024: f["sha256"]=sha256_file(path)
         except (OSError,PermissionError): pass
 
+def write_html(report, path):
+    rows=[]
+    for finding in report.get('findings',[]):
+        rows.append('<tr><td>{}</td><td>{}</td><td>{}</td><td><code>{}</code></td></tr>'.format(
+            html.escape(str(finding.get('engine',finding.get('type','')))),
+            html.escape(str(finding.get('rule',finding.get('signature',finding.get('reason',''))))),
+            html.escape(str(finding.get('path',''))),
+            html.escape(str(finding.get('sha256','')))))
+    body=''.join(rows) or '<tr><td colspan="4">No findings reported.</td></tr>'
+    page='''<!doctype html><html><head><meta charset="utf-8"><title>SentinelUSB Scan Report</title><style>body{font:15px system-ui,sans-serif;max-width:1100px;margin:40px auto;padding:0 20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px;text-align:left}code{word-break:break-all}</style></head><body><h1>SentinelUSB Scan Report</h1><p><b>Device:</b> {}</p><p><b>Mode:</b> READ-ONLY</p><p><b>Findings:</b> {}</p><table><tr><th>Engine</th><th>Detection</th><th>Path</th><th>SHA-256</th></tr>{}</table></body></html>'''.format(html.escape(report['device']),report['finding_count'],body)
+    path.write_text(page)
+
 def scan(device,rules,output_root):
     stamp=time.strftime('%Y-%m-%d_%H-%M-%S')
     output_dir=Path(output_root)/f'Scan_{stamp}'
@@ -122,7 +134,8 @@ def scan(device,rules,output_root):
                 "findings":findings,
                 "engine_status":{"clamav":"ok" if not any(x.get("error") for x in clam) else "error",
                                  "yara":"ok" if not any(x.get("error") for x in yara) else "error"}}
-        (output_dir/"report.json").write_text(json.dumps(report,indent=2))
+        (output_dir/'report.json').write_text(json.dumps(report,indent=2))
+        write_html(report, output_dir/'report.html')
         return report
     finally:
         try: unmount(mountpoint)
