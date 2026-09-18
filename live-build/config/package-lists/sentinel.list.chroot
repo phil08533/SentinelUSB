@@ -15,3 +15,7 @@ libfsapfs-utils
 fuse3
 libhivex-bin
 libwin-hivex-perl
+sudo
+xserver-xorg
+xinit
+xauth
