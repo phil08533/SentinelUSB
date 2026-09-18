@@ -40,8 +40,7 @@ $$_________$$$$$$$$$$$$$$$__________________
 
 RULES=Path("/usr/local/share/sentinelusb/rules/sentinel.yar")
 REPORTS=Path("/run/live/medium/Reports")
-if not os.access(REPORTS.parent, os.W_OK):
-    REPORTS=Path("/var/log/sentinelusb")
+# The live ISO itself is read-only; use a writable Reports directory on the boot medium when available.\nif not os.access(REPORTS.parent, os.W_OK):\n    REPORTS=Path("/var/log/sentinelusb")
 
 def help_text():
     print("""
