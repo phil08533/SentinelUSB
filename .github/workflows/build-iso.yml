@@ -1,0 +1,47 @@
+name: Build SentinelUSB ISO
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "live-build/**"
+      - "src/**"
+      - ".github/workflows/build-iso.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install live-build
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y live-build
+
+      - name: Build ISO
+        working-directory: live-build
+        run: |
+          chmod +x auto/config
+          ./auto/config
+          sudo lb build
+
+      - name: Prepare artifact
+        working-directory: live-build
+        run: |
+          ISO="$(find . -maxdepth 1 -type f -name '*.iso' -print -quit)"
+          test -n "$ISO"
+          cp "$ISO" SentinelUSB.iso
+          sha256sum SentinelUSB.iso > SentinelUSB.iso.sha256
+
+      - name: Upload ISO
+        uses: actions/upload-artifact@v4
+        with:
+          name: SentinelUSB-ISO
+          path: |
+            live-build/SentinelUSB.iso
+            live-build/SentinelUSB.iso.sha256
+          retention-days: 14
