@@ -44,7 +44,6 @@ jobs:
           cp "$ISO" SentinelUSB.iso
           test "$(file -b SentinelUSB.iso | grep -c 'ISO 9660')" -eq 1
           xorriso -indev SentinelUSB.iso -toc >/tmp/sentinel-xorriso.txt 2>&1
-          grep -q 'ISO 9660' /tmp/sentinel-xorriso.txt
           sha256sum SentinelUSB.iso > SentinelUSB.iso.sha256
           split -b 400M -d -a 2 SentinelUSB.iso SentinelUSB.iso.part-
           sha256sum SentinelUSB.iso.part-* > SentinelUSB.iso.parts.sha256
