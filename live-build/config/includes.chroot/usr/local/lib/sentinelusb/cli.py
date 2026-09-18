@@ -48,7 +48,7 @@ Commands:
   help              Show this help
   version           Show SentinelUSB version
   drives            List disks and partitions
-  scan <device>     Scan a Windows volume read-only
+  scan <device>     Scan a Windows, Linux, or macOS volume read-only
   exit              Leave SentinelUSB
 
 Example:
@@ -72,7 +72,7 @@ def do_scan(device):
         return
     print(f"\n[+] Scanning {device}")
     print("[+] Target will be mounted read-only.")
-    print("[+] ClamAV + YARA + persistence checks are running.")
+    print("[+] OS-aware ClamAV + YARA + persistence checks are running.")
     try:
         report=scan(device,RULES,REPORTS)
     except Exception as exc:
@@ -88,7 +88,7 @@ def dispatch(parts):
     cmd=parts[0].lower()
     if cmd in {"exit","quit"}: return False
     if cmd=="help": help_text()
-    elif cmd=="version": print("SentinelUSB 0.1.0")
+    elif cmd=="version": print("SentinelUSB 0.2.0")
     elif cmd=="drives":
         try: show_drives()
         except Exception as exc: print(f"[!] Could not enumerate drives: {exc}")
