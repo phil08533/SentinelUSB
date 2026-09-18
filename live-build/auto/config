@@ -8,6 +8,8 @@ lb config noauto \
   --mirror-bootstrap "http://deb.debian.org/debian/" \
   --mirror-chroot "http://deb.debian.org/debian/" \
   --mirror-binary "http://deb.debian.org/debian/" \
+  --mirror-chroot-security "http://deb.debian.org/debian-security/" \
+  --mirror-binary-security "http://deb.debian.org/debian-security/" \
   --binary-images iso-hybrid \
   --debian-installer false \
   --apt-recommends false \
