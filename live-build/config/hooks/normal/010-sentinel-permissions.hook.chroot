@@ -1,0 +1,3 @@
+#!/bin/sh
+set -eu
+chmod +x /usr/local/bin/sentinel /usr/local/lib/sentinelusb/cli.py
