@@ -1,17 +1,21 @@
 #!/usr/bin/env python3
-"""SentinelUSB cross-platform scanning engine.
-
-Targets Windows, Linux, and macOS volumes when the live environment can
-mount/read the filesystem. Scanning is read-only and uses common engines
-plus OS-specific persistence checks.
-"""
+"""SentinelUSB cross-platform scanning engine."""
 
 from __future__ import annotations
-import hashlib, html, json, os, shutil, subprocess, tempfile, time
+
+import hashlib
+import html
+import json
+import os
+import re
+import shutil
+import subprocess
+import tempfile
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-VERSION = "0.3.0"
+VERSION = "0.4.0"
 
 
 def run(cmd):
@@ -37,30 +41,15 @@ def flatten_devices(nodes):
 
 
 def detect_os(root):
-    """Return a best-effort OS profile based on filesystem markers."""
-    windows_markers = [
-        root / "Windows",
-        root / "Users",
-        root / "Program Files",
-    ]
-    linux_markers = [
-        root / "etc/os-release",
-        root / "etc/systemd",
-        root / "usr/bin",
-        root / "var",
-    ]
-    mac_markers = [
-        root / "System/Library",
-        root / "Library",
-        root / "Users",
-        root / "Applications",
-    ]
+    windows = [root / "Windows", root / "Users", root / "Program Files"]
+    linux = [root / "etc/os-release", root / "etc/systemd", root / "usr/bin", root / "var"]
+    mac = [root / "System/Library", root / "Library", root / "Users", root / "Applications"]
 
-    if sum(p.exists() for p in windows_markers) >= 2:
+    if sum(p.exists() for p in windows) >= 2:
         return "Windows"
-    if sum(p.exists() for p in linux_markers) >= 3:
+    if sum(p.exists() for p in linux) >= 3:
         return "Linux"
-    if sum(p.exists() for p in mac_markers) >= 3 and (root / "System/Library").exists():
+    if sum(p.exists() for p in mac) >= 3 and (root / "System/Library").exists():
         return "macOS"
     return "Unknown"
 
@@ -71,9 +60,11 @@ def filesystem_type(device):
 
 
 def _fuse_unmount(mountpoint):
-    for command in (["fusermount3", "-u", str(mountpoint)],
-                    ["fusermount", "-u", str(mountpoint)],
-                    ["umount", str(mountpoint)]):
+    for command in (
+        ["fusermount3", "-u", str(mountpoint)],
+        ["fusermount", "-u", str(mountpoint)],
+        ["umount", str(mountpoint)],
+    ):
         if shutil.which(command[0]):
             result = run(command)
             if result.returncode == 0:
@@ -82,13 +73,6 @@ def _fuse_unmount(mountpoint):
 
 
 def mount_apfs_read_only(device):
-    """Mount the macOS APFS volume containing the OS, read-only.
-
-    libfsapfs is a userspace, read-only APFS implementation. An APFS
-    container can hold several volumes, so probe volume indexes until the
-    macOS system volume is found. Encrypted/FileVault volumes are reported
-    as inaccessible rather than attempting to bypass encryption.
-    """
     if shutil.which("fsapfsmount") is None:
         raise RuntimeError("APFS support is not installed (fsapfsmount missing)")
 
@@ -100,15 +84,12 @@ def mount_apfs_read_only(device):
             errors.append(result.stderr.strip())
             shutil.rmtree(mountpoint, ignore_errors=True)
             continue
-
-        os_name = detect_os(mountpoint)
-        if os_name == "macOS":
+        if detect_os(mountpoint) == "macOS":
             return mountpoint
-
         _fuse_unmount(mountpoint)
         shutil.rmtree(mountpoint, ignore_errors=True)
 
-    detail = next((e for e in errors if e), "no APFS volume matched the macOS filesystem markers")
+    detail = next((e for e in errors if e), "no APFS volume matched macOS markers")
     raise RuntimeError(f"Could not access a macOS APFS system volume: {detail}")
 
 
@@ -138,7 +119,6 @@ def sha256_file(path):
 
 
 def _iter_files(directory, limit=5000):
-    """Yield a bounded set of files so persistence checks cannot explode."""
     if not directory.is_dir():
         return
     count = 0
@@ -168,7 +148,7 @@ def windows_persistence_checks(root):
             pass
 
     for directory in paths:
-        for entry in _iter_files(directory, limit=1000) or []:
+        for entry in _iter_files(directory, 1000) or []:
             findings.append({
                 "type": "startup_item",
                 "path": str(entry.relative_to(root)),
@@ -177,13 +157,125 @@ def windows_persistence_checks(root):
             })
 
     tasks = root / "Windows/System32/Tasks"
-    for entry in _iter_files(tasks, limit=5000) or []:
+    for entry in _iter_files(tasks, 5000) or []:
         findings.append({
             "type": "scheduled_task",
             "path": str(entry.relative_to(root)),
             "reason": "Windows scheduled-task definition present",
             "severity": "low",
         })
+
+    findings.extend(windows_registry_checks(root))
+    return findings
+
+
+def _registry_values(hive, key):
+    if shutil.which("hivexget") is None:
+        return []
+    result = run(["hivexget", str(hive), key])
+    if result.returncode != 0:
+        return []
+    values = []
+    for line in result.stdout.splitlines():
+        match = re.match(r'^"([^"]+)"=', line.strip())
+        if match:
+            values.append((match.group(1), line.strip()))
+    return values
+
+
+def _registry_string_value(hive, key, name):
+    if shutil.which("hivexget") is None:
+        return ""
+    result = run(["hivexget", str(hive), key, name])
+    return result.stdout.strip() if result.returncode == 0 else ""
+
+
+def _registry_findings(hive, key, reason, severity="medium"):
+    findings = []
+    for name, raw in _registry_values(hive, key):
+        findings.append({
+            "type": "registry_persistence",
+            "path": f"{hive.name}:{key}:{name}",
+            "reason": reason,
+            "value": raw[:1000],
+            "severity": severity,
+        })
+    return findings
+
+
+def _current_control_set(system_hive):
+    value = _registry_string_value(system_hive, r"\Select", "Current")
+    try:
+        number = int(value)
+        return f"ControlSet{number:03d}"
+    except ValueError:
+        return "ControlSet001"
+
+
+def _service_registry_findings(system_hive):
+    if shutil.which("hivexregedit") is None:
+        return []
+    control = _current_control_set(system_hive)
+    result = run([
+        "hivexregedit", "--export", "--max-depth", "2",
+        str(system_hive), rf"\{control}\Services"
+    ])
+    if result.returncode != 0:
+        return []
+
+    findings = []
+    current_service = None
+    for line in result.stdout.splitlines():
+        section = re.match(r"^\[(.+)\]$", line.strip())
+        if section:
+            current_service = section.group(1)
+            continue
+        if current_service and re.search(r'"(ImagePath|ServiceDll)"=', line, re.I):
+            findings.append({
+                "type": "service_registry",
+                "path": f"{system_hive.name}:{current_service}",
+                "reason": "Windows service registry entry contains an executable or service DLL path",
+                "value": line.strip()[:1000],
+                "severity": "medium",
+            })
+    return findings[:2000]
+
+
+def windows_registry_checks(root):
+    findings = []
+    software = root / "Windows/System32/config/SOFTWARE"
+    system = root / "Windows/System32/config/SYSTEM"
+
+    if software.is_file():
+        for key in (
+            r"\Microsoft\Windows\CurrentVersion\Run",
+            r"\Microsoft\Windows\CurrentVersion\RunOnce",
+            r"\Microsoft\Windows\CurrentVersion\RunOnceEx",
+            r"\Microsoft\Windows NT\CurrentVersion\Winlogon",
+        ):
+            reason = "Windows Registry startup or logon value present"
+            findings.extend(_registry_findings(software, key, reason))
+
+    if system.is_file():
+        findings.extend(_service_registry_findings(system))
+
+    if users.is_dir():
+        try:
+            user_dirs = [p for p in users.iterdir() if p.is_dir()]
+        except PermissionError:
+            user_dirs = []
+        for user in user_dirs[:100]:
+            hive = user / "NTUSER.DAT"
+            if not hive.is_file():
+                continue
+            for key in (
+                r"\Software\Microsoft\Windows\CurrentVersion\Run",
+                r"\Software\Microsoft\Windows\CurrentVersion\RunOnce",
+                r"\Software\Microsoft\Windows\CurrentVersion\RunOnceEx",
+            ):
+                findings.extend(_registry_findings(
+                    hive, key, "User Registry startup value present"
+                ))
     return findings
 
 
@@ -200,7 +292,7 @@ def linux_persistence_checks(root):
         (root / "etc/init.d", "SysV init script"),
     ]
     for directory, kind in directories:
-        for entry in _iter_files(directory, limit=2000) or []:
+        for entry in _iter_files(directory, 2000) or []:
             findings.append({
                 "type": "persistence",
                 "path": str(entry.relative_to(root)),
@@ -209,42 +301,39 @@ def linux_persistence_checks(root):
             })
 
     users = root / "home"
-    for user in users.iterdir() if users.is_dir() else []:
-        if not user.is_dir():
-            continue
-        for rel in [
-            ".config/autostart",
-            ".bashrc",
-            ".bash_profile",
-            ".profile",
-            ".zshrc",
-        ]:
-            target = user / rel
-            if target.is_file():
-                findings.append({
-                    "type": "user_startup",
-                    "path": str(target.relative_to(root)),
-                    "reason": "Linux user startup configuration found",
-                    "severity": "low",
-                })
-            elif target.is_dir():
-                for entry in _iter_files(target, limit=1000) or []:
+    if users.is_dir():
+        try:
+            user_dirs = list(users.iterdir())
+        except PermissionError:
+            user_dirs = []
+        for user in user_dirs[:100]:
+            if not user.is_dir():
+                continue
+            for rel in [".config/autostart", ".bashrc", ".bash_profile", ".profile", ".zshrc"]:
+                target = user / rel
+                if target.is_file():
                     findings.append({
                         "type": "user_startup",
-                        "path": str(entry.relative_to(root)),
-                        "reason": "Linux user autostart entry found",
+                        "path": str(target.relative_to(root)),
+                        "reason": "Linux user startup configuration found",
                         "severity": "low",
                     })
-
-    ssh = users
-    for entry in _iter_files(ssh, limit=5000) or []:
-        if entry.name == "authorized_keys" or entry.name == "authorized_keys2":
-            findings.append({
-                "type": "ssh_persistence",
-                "path": str(entry.relative_to(root)),
-                "reason": "SSH authorized_keys file can provide persistent remote access",
-                "severity": "medium",
-            })
+                elif target.is_dir():
+                    for entry in _iter_files(target, 1000) or []:
+                        findings.append({
+                            "type": "user_startup",
+                            "path": str(entry.relative_to(root)),
+                            "reason": "Linux user autostart entry found",
+                            "severity": "low",
+                        })
+            for entry in _iter_files(user / ".ssh", 100) or []:
+                if entry.name in {"authorized_keys", "authorized_keys2"}:
+                    findings.append({
+                        "type": "ssh_persistence",
+                        "path": str(entry.relative_to(root)),
+                        "reason": "SSH authorized_keys file can provide persistent remote access",
+                        "severity": "medium",
+                    })
     return findings
 
 
@@ -266,7 +355,7 @@ def macos_persistence_checks(root):
             pass
 
     for directory, kind in locations:
-        for entry in _iter_files(directory, limit=2000) or []:
+        for entry in _iter_files(directory, 2000) or []:
             findings.append({
                 "type": "persistence",
                 "path": str(entry.relative_to(root)),
@@ -275,7 +364,7 @@ def macos_persistence_checks(root):
             })
 
     profiles = root / "Library/Profiles"
-    for entry in _iter_files(profiles, limit=1000) or []:
+    for entry in _iter_files(profiles, 1000) or []:
         findings.append({
             "type": "configuration_profile",
             "path": str(entry.relative_to(root)),
@@ -377,42 +466,63 @@ def write_html(report, path):
 <title>SentinelUSB Scan Report</title>
 <style>body{font:15px system-ui,sans-serif;max-width:1200px;margin:40px auto;padding:0 20px}
 table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px;text-align:left}
-code{word-break:break-all} .meta{line-height:1.7}</style></head><body>
+code{word-break:break-all}.meta{line-height:1.7}</style></head><body>
 <h1>SentinelUSB Scan Report</h1>
 <div class="meta"><p><b>Device:</b> {}</p><p><b>Detected OS:</b> {}</p>
-<p><b>Mode:</b> READ-ONLY</p><p><b>Findings:</b> {}</p></div>
+<p><b>Mode:</b> READ-ONLY</p><p><b>Findings:</b> {}</p>
+<p><b>Started:</b> {}</p><p><b>Completed:</b> {}</p></div>
 <table><tr><th>Engine</th><th>Severity</th><th>Detection</th><th>Path</th><th>SHA-256</th></tr>{}</table>
 </body></html>""".format(
         html.escape(report["device"]),
         html.escape(report["os"]),
         report["finding_count"],
+        html.escape(report["started_at"]),
+        html.escape(report["completed_at"]),
         body,
     )
-    path.write_text(page)
+    path.write_text(page, encoding="utf-8")
 
 
-def scan(device, rules, output_root):
-    stamp = time.strftime("%Y-%m-%d_%H-%M-%S")
-    output_dir = Path(output_root) / f"Scan_{stamp}"
-    output_dir.mkdir(parents=True, exist_ok=True)
+def scan(device, rules, output_root, progress=None):
+    def say(message):
+        if progress:
+            progress(message)
+
+    started = datetime.now(timezone.utc).isoformat()
+    say("Mounting target read-only...")
     mountpoint = mount_read_only(device)
+    output_dir = None
     try:
         os_name = detect_os(mountpoint)
+        say(f"Detected operating system: {os_name}")
         if os_name == "Unknown":
             raise RuntimeError(
                 "Mounted volume could not be identified as Windows, Linux, or macOS. "
                 "The filesystem may be unsupported, encrypted, or not an OS volume."
             )
+
+        stamp = time.strftime("%Y-%m-%d_%H-%M-%S")
+        output_dir = Path(output_root) / f"Scan_{stamp}"
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        say("Checking persistence locations...")
         persistence = persistence_checks(mountpoint, os_name)
+
+        say("Running ClamAV...")
         clam = run_clamav(mountpoint, output_dir)
+
+        say("Running YARA...")
         yara = run_yara(mountpoint, rules)
+
         findings = [x for x in clam + yara + persistence if "error" not in x]
         add_hashes(findings, mountpoint)
+
+        completed = datetime.now(timezone.utc).isoformat()
         report = {
             "product": "SentinelUSB",
             "version": VERSION,
-            "started_at": datetime.now(timezone.utc).isoformat(),
-            "completed_at": datetime.now(timezone.utc).isoformat(),
+            "started_at": started,
+            "completed_at": completed,
             "device": device,
             "os": os_name,
             "mount_mode": "read-only",
@@ -422,11 +532,14 @@ def scan(device, rules, output_root):
             "engine_status": {
                 "clamav": "ok" if not any(x.get("error") for x in clam) else "error",
                 "yara": "ok" if not any(x.get("error") for x in yara) else "error",
+                "registry": "available" if shutil.which("hivexget") else "unavailable",
+                "service_registry": "available" if shutil.which("hivexregedit") else "unavailable",
                 "apfs": "available" if shutil.which("fsapfsmount") else "unavailable",
             },
         }
-        (output_dir / "report.json").write_text(json.dumps(report, indent=2))
+        (output_dir / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
         write_html(report, output_dir / "report.html")
+        say("Report written.")
         return report
     finally:
         try:
