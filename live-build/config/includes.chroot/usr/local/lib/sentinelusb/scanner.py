@@ -435,6 +435,18 @@ def run_yara(root, rules):
     return findings
 
 
+def normalize_finding_paths(findings, root):
+    for finding in findings:
+        raw = finding.get("path")
+        if not raw:
+            continue
+        path = Path(raw)
+        try:
+            finding["path"] = str(path.relative_to(root))
+        except ValueError:
+            pass
+
+
 def add_hashes(findings, root):
     for finding in findings:
         raw = finding.get("path")
@@ -516,6 +528,7 @@ def scan(device, rules, output_root, progress=None):
         yara = run_yara(mountpoint, rules)
 
         findings = [x for x in clam + yara + persistence if "error" not in x]
+        normalize_finding_paths(findings, mountpoint)
         add_hashes(findings, mountpoint)
 
         completed = datetime.now(timezone.utc).isoformat()
